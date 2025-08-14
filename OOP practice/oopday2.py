@@ -42,7 +42,7 @@ class ExpenseTracker:
         if amount <= 0:
             raise ValueError("Amount should be greater than zero")
 
-        # Optional: verify category exists
+        #verify category exists
         if not any(cat.name == category_name for cat in self.categories):
             print(f'Category:{category_name} does not exist')
             return None
@@ -108,5 +108,5 @@ class ExpenseTracker:
 product = ExpenseTracker()
 product.add_category('Groceries')
 product.add_category('Drugs')
-print(product.total_expenses_by_category('Drugs'))
+print(product.total_expenses_by_category('Stationaries'))
 
