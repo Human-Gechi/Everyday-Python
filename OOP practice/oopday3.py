@@ -1,9 +1,15 @@
 import uuid
 from datetime import datetime
+import random
+import psycopg2
+import psycopg2.extras
+import os
+from dotenv import load_dotenv
 
 class Transaction:
-    def __init__(self, date: datetime = None, amount: float = 0.0, category: str = "", transaction_type: str = "", description: str = ""):
-        self.__id = uuid.uuid4()  # Generates a random UUID
+    def __init__(self,userid,date: datetime = None, amount: float = 0.0, category: str = "", transaction_type: str = "", description: str = ""):
+        self.userid = userid
+        self.id = uuid.uuid4() # Generates a random UUID
         self.date = date or datetime.now()  # Keep as datetime for calculations
         self.amount = amount
         self.category = category
@@ -20,9 +26,102 @@ class Transaction:
         )
     def __repr__(self):
         return f"Amount: {self.amount}|Category: {self.category}|Description:{self.description}"
+
+class User:
+    def __init__(self,userid: int,first_name: str='',last_name: str=''):
+        self.userid = random.randint(1000,9999) or userid
+        self.first_name = first_name
+        self.last_name = last_name
+        self.transactions = []
+
+    def add_transaction(self, transaction):
+        if not isinstance(transaction, Transaction):
+            raise TypeError("Expected a Transaction object")
+        self.transactions.append(transaction)
+        return True
+    def get_transaction(self):
+        for transaction in self.transactions:
+            return transaction
+    def total_expenses(self, category):
+        total = sum(t.amount for t in self.transactions
+                    if isinstance(t, Transaction) and t.category == category)
+        return f"{total} has been spent on {category}"
+    def __repr__(self):
+        return f'Id:{self.id}|Customer: {self.first_name} {self.last_name}'
+class DBMANAGER:
+    def __init__(self):
+        load_dotenv()
+        # env keys: DB_HOST, DB_NAME, DB_USER, DB_PASSWORD, DB_PORT
+        self.conn = psycopg2.connect(
+            host=os.getenv("DB_HOST", "localhost"),
+            dbname=os.getenv("DB_NAME"),
+            user=os.getenv("DB_USER"),
+            password=os.getenv("DB_PASSWORD"),
+            port=int(os.getenv("DB_PORT", 5432))
+        )
+        self.cur = self.conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    def query(self, sql, params=None):
+        self.cur.execute(sql, params or ())
+        return self.cur.fetchall()
+
+    def execute(self, sql, params=None, commit: bool = True):
+        self.cur.execute(sql, params or ())
+        if commit:
+            self.conn.commit()
+
+    def executemany(self, sql, seq_of_params, commit: bool = True):
+        self.cur.executemany(sql, seq_of_params)
+        if commit:
+            self.conn.commit()
+
+    def close(self):
+        self.cur.close()
+        self.conn.close()
+    def create_tables(self):
+        self.execute(
+        """CREATE TABLE IF NOT EXISTS USERS,
+        user_id INT PRIMARY KEY,
+        f_name VARCHAR(100),
+        l_nameVARCHAR(100),
+       """)
+        self.execute("""
+            CREATE TABLE IF NOT EXISTS TRANSACTIONS
+            transaction_id UUID PRIMARY KEY,
+            user_id INTEGER REFERENCES users(user_id) ON DELETE CASCADE,
+            date TIMESTAMP NOT NULL,
+            amount NUMERIC(10, 2) NOT NULL,
+            category TEXT,
+            transaction_type TEXT CHECKS (transaction_type IN('income','expense','transfer'),
+            description TEXT
+            """)
+    def insert_user(self,user):
+        if isinstance(user, User):
+            self.cur.execute(
+                """
+                INSERT INTO USERS(user_id,f_name,l_name) 
+                VALUES (%s,%s,%s)""",
+                (user.userid, user.first_name,user.last_name)
+            )
+    def insert_transaction(self,transaction):
+        if isinstance(transaction, Transaction):
+            self.cur.execute("""
+                    INSERT INTO TRANSACTIONS(transaction_id,user_id,date,amount,category,transaction_type,description)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s)""",
+                    (transaction.userid,transaction.id,transaction.date,
+                     transaction.amount,transaction.category,
+                     transaction.transaction_type,transaction.description)
+                    )
+    def fetch_transactions_by_user(self, user_id):
+        self.cur.execute("SELECT * FROM transactions WHERE user_id = %s;", (user_id,))
+        return self.cur.fetchall()
+    def delete_transactions(self,transaction_id):
+        self.cur.execute("DELETE * FROM TRANSACTIONS WHERE transaction_id = %s;",(transaction_id))
+        self.conn.commit()
+        return f" Transaction {transaction_id} has been deleted"
+
 class Ledger:
-    def __init__(self,db_connection):
-        self.transaction = []
-        self.db_connection = db_connection
-    def add_transaction(self,transaction,db_connection):
+    def __init__(self,db_manager):
+        self.users =[]
+        self.db_manager = db_manager
+    def add_user(self,user,db_manager):
         pass
