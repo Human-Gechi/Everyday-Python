@@ -15,25 +15,15 @@ class Transaction:
         self.category = category
         self.transaction_type = transaction_type
         self.description = description
-    def to_tuple(self):
-        return (
-            str(self.__id),
-            self.date,
-            self.amount,
-            self.category,
-            self.transaction_type,
-            self.description
-        )
     def __repr__(self):
         return f"Amount: {self.amount}|Category: {self.category}|Description:{self.description}"
 
 class User:
-    def __init__(self,userid: int,first_name: str='',last_name: str=''):
-        self.userid = random.randint(1000,9999) or userid
-        self.first_name = first_name
-        self.last_name = last_name
+    def __init__(self, userid: int = None, first_name: str = '', last_name: str = ''):
+        self.userid = userid if userid is not None else random.randint(1000, 9999)
+        self.first_name = first_name.upper()
+        self.last_name = last_name.upper()
         self.transactions = []
-
     def add_transaction(self, transaction):
         if not isinstance(transaction, Transaction):
             raise TypeError("Expected a Transaction object")
@@ -47,7 +37,7 @@ class User:
                     if isinstance(t, Transaction) and t.category == category)
         return f"{total} has been spent on {category}"
     def __repr__(self):
-        return f'Id:{self.id}|Customer: {self.first_name} {self.last_name}'
+        return f'Id:{self.userid}|Customer: {self.first_name} {self.last_name}'
 class DBMANAGER:
     def __init__(self):
         load_dotenv()
@@ -79,49 +69,87 @@ class DBMANAGER:
         self.conn.close()
     def create_tables(self):
         self.execute(
-        """CREATE TABLE IF NOT EXISTS USERS,
-        user_id INT PRIMARY KEY,
+        """CREATE TABLE IF NOT EXISTS USERS(
+        user_id INTEGER PRIMARY KEY,
         f_name VARCHAR(100),
-        l_nameVARCHAR(100),
+        l_name VARCHAR(100)
+       );
        """)
         self.execute("""
-            CREATE TABLE IF NOT EXISTS TRANSACTIONS
+            CREATE TABLE IF NOT EXISTS TRANSACTION(
             transaction_id UUID PRIMARY KEY,
             user_id INTEGER REFERENCES users(user_id) ON DELETE CASCADE,
             date TIMESTAMP NOT NULL,
             amount NUMERIC(10, 2) NOT NULL,
             category TEXT,
-            transaction_type TEXT CHECKS (transaction_type IN('income','expense','transfer'),
+            transaction_type TEXT CHECK (transaction_type IN('income','expense','transfer')),
             description TEXT
+            );
             """)
-    def insert_user(self,user):
-        if isinstance(user, User):
+    def insert_user(self, user):
+            if isinstance(user, User):
+                self.cur.execute(
+                    """
+                    INSERT INTO USERS(user_id,f_name,l_name) 
+                    VALUES (%s,%s,%s)""",
+                    (user.userid, user.first_name, user.last_name)
+                )
+            self.conn.commit()  # Commit the transaction
+    def insert_transaction(self, transaction, user_id):
+        if not isinstance(transaction, Transaction):
+            raise TypeError("transaction must be a Transaction object")
+        try:
             self.cur.execute(
                 """
-                INSERT INTO USERS(user_id,f_name,l_name) 
-                VALUES (%s,%s,%s)""",
-                (user.userid, user.first_name,user.last_name)
+                INSERT INTO transaction (
+                    transaction_id, user_id, date, amount, category, transaction_type, description
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """,
+                (str(transaction.id), user_id, transaction.date, transaction.amount,
+                transaction.category, transaction.transaction_type, transaction.description)
             )
-    def insert_transaction(self,transaction):
-        if isinstance(transaction, Transaction):
-            self.cur.execute("""
-                    INSERT INTO TRANSACTIONS(transaction_id,user_id,date,amount,category,transaction_type,description)
-                    VALUES (%s,%s,%s,%s,%s,%s,%s)""",
-                    (transaction.userid,transaction.id,transaction.date,
-                     transaction.amount,transaction.category,
-                     transaction.transaction_type,transaction.description)
-                    )
+            self.conn.commit()
+        except Exception as e:
+            print("Insert error:", e)
+
     def fetch_transactions_by_user(self, user_id):
-        self.cur.execute("SELECT * FROM transactions WHERE user_id = %s;", (user_id,))
+        self.cur.execute("SELECT * FROM transaction WHERE user_id = %s;", (user_id,))
         return self.cur.fetchall()
     def delete_transactions(self,transaction_id):
-        self.cur.execute("DELETE * FROM TRANSACTIONS WHERE transaction_id = %s;",(transaction_id))
+        self.cur.execute("DELETE FROM TRANSACTION WHERE transaction_id = %s;",(transaction_id,))
         self.conn.commit()
         return f" Transaction {transaction_id} has been deleted"
 
 class Ledger:
-    def __init__(self,db_manager):
-        self.users =[]
+    def __init__(self, db_manager):
+        self.users = []          # in-memory list
         self.db_manager = db_manager
-    def add_user(self,user,db_manager):
-        pass
+
+    def add_user(self, user):
+        self.users.append(user)
+
+        self.db_manager.insert_user(user)
+
+        return f"User {user.first_name} {user.last_name} added."
+    def add_transaction(self, user_id, transaction):
+        # ✅ Ensure transaction is valid
+        if not isinstance(transaction, Transaction):
+            raise TypeError("transaction must be a Transaction object")
+        # ✅ Find the user in memory
+        user = next((u for u in self.users if u.userid == user_id), None)
+        if not user:
+            raise ValueError(f"No user found with ID {user_id}")
+        # ✅ Add to the user's transaction list
+        user.transactions.append(transaction)
+
+        self.db_manager.insert_transaction(transaction, user_id)
+
+        return f"Transaction added for {user.first_name} {user.last_name}"
+    def get_user_transactions(self, user_id):
+        # ✅ Ensure user_id exists in memory
+        user = next((u for u in self.users if u.userid == user_id), None)
+        if not user:
+            raise ValueError(f"No user found with ID {user_id}")
+
+        return self.db_manager.fetch_transactions_by_user(user_id)
