@@ -5,7 +5,7 @@ import psycopg2
 import psycopg2.extras
 import os
 from dotenv import load_dotenv
-
+# TRANSACTION CLASS
 class Transaction:
     def __init__(self,userid,date: datetime = None, amount: float = 0.0, category: str = "", transaction_type: str = "", description: str = ""):
         self.userid = userid
@@ -17,7 +17,7 @@ class Transaction:
         self.description = description
     def __repr__(self):
         return f"Amount: {self.amount}|Category: {self.category}|Description:{self.description}"
-
+#USER CLASS
 class User:
     def __init__(self, userid: int = None, first_name: str = '', last_name: str = ''):
         self.userid = userid if userid is not None else random.randint(1000, 9999)
@@ -38,9 +38,11 @@ class User:
         return f"{total} has been spent on {category}"
     def __repr__(self):
         return f'Id:{self.userid}|Customer: {self.first_name} {self.last_name}'
+#DATABASE MANAGER CLASS
 class DBMANAGER:
     def __init__(self):
         load_dotenv()
+        #ESTABLISHING SQL CONNECTION
         # env keys: DB_HOST, DB_NAME, DB_USER, DB_PASSWORD, DB_PORT
         self.conn = psycopg2.connect(
             host=os.getenv("DB_HOST", "localhost"),
@@ -53,20 +55,21 @@ class DBMANAGER:
     def query(self, sql, params=None):
         self.cur.execute(sql, params or ())
         return self.cur.fetchall()
-
+    #execute one query at a time
     def execute(self, sql, params=None, commit: bool = True):
         self.cur.execute(sql, params or ())
         if commit:
             self.conn.commit()
-
+    #executing more than one query
     def executemany(self, sql, seq_of_params, commit: bool = True):
         self.cur.executemany(sql, seq_of_params)
         if commit:
             self.conn.commit()
-
+    #closing connection
     def close(self):
         self.cur.close()
         self.conn.close()
+    # creating tables for the Database
     def create_tables(self):
         self.execute(
         """CREATE TABLE IF NOT EXISTS USERS(
@@ -74,7 +77,7 @@ class DBMANAGER:
         f_name VARCHAR(100),
         l_name VARCHAR(100)
        );
-       """)
+       """) #tarnsaction table
         self.execute("""
             CREATE TABLE IF NOT EXISTS TRANSACTION(
             transaction_id UUID PRIMARY KEY,
@@ -86,6 +89,7 @@ class DBMANAGER:
             description TEXT
             );
             """)
+    #Function to insert user into the database
     def insert_user(self, user):
             if isinstance(user, User):
                 self.cur.execute(
@@ -95,6 +99,7 @@ class DBMANAGER:
                     (user.userid, user.first_name, user.last_name)
                 )
             self.conn.commit()  # Commit the transaction
+    #function to insert transactions into the database
     def insert_transaction(self, transaction, user_id):
         if not isinstance(transaction, Transaction):
             raise TypeError("transaction must be a Transaction object")
@@ -112,7 +117,10 @@ class DBMANAGER:
             self.conn.commit()
         except Exception as e:
             print("Insert error:", e)
-
+    #function to fetch users
+    def fetch_user(self,firstname):
+        self.cur.execute('SELECT * FROM users WHERE f_name = %s;', (firstname,))
+        return self.cur.fetchall()
     def fetch_transactions_by_user(self, user_id):
         self.cur.execute("SELECT * FROM transaction WHERE user_id = %s;", (user_id,))
         return self.cur.fetchall()
@@ -120,11 +128,11 @@ class DBMANAGER:
         self.cur.execute("DELETE FROM TRANSACTION WHERE transaction_id = %s;",(transaction_id,))
         self.conn.commit()
         return f" Transaction {transaction_id} has been deleted"
-
+#Ledger class handling main logic
 class Ledger:
     def __init__(self, db_manager):
-        self.users = []          # in-memory list
-        self.db_manager = db_manager
+        self.users = []          # in-memory list of users
+        self.db_manager = db_manager # handling database connectiion
 
     def add_user(self, user):
         self.users.append(user)
@@ -133,23 +141,29 @@ class Ledger:
 
         return f"User {user.first_name} {user.last_name} added."
     def add_transaction(self, user_id, transaction):
-        # ✅ Ensure transaction is valid
+        # Ensure transaction is valid
         if not isinstance(transaction, Transaction):
             raise TypeError("transaction must be a Transaction object")
-        # ✅ Find the user in memory
+        #Find the user in memory
         user = next((u for u in self.users if u.userid == user_id), None)
         if not user:
             raise ValueError(f"No user found with ID {user_id}")
-        # ✅ Add to the user's transaction list
+        #Add to the user's transaction list
         user.transactions.append(transaction)
 
         self.db_manager.insert_transaction(transaction, user_id)
 
         return f"Transaction added for {user.first_name} {user.last_name}"
+    def get_user(self,firstname): # Accessing users by their names
+        user = [(u for u in self.users if u.first_name == firstname)]
+        if not user:
+            raise ValueError('User does not exist')
+        else:
+            return self.db_manager.fetch_user(firstname)
     def get_user_transactions(self, user_id):
-        # ✅ Ensure user_id exists in memory
-        user = next((u for u in self.users if u.userid == user_id), None)
+        # Ensure user_id exists in memory using list expression
+
+        user = [(u for u in self.users if u.userid == user_id)]
         if not user:
             raise ValueError(f"No user found with ID {user_id}")
-
         return self.db_manager.fetch_transactions_by_user(user_id)
