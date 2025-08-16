@@ -118,8 +118,8 @@ class DBMANAGER:
         except Exception as e:
             print("Insert error:", e)
     #function to fetch users
-    def fetch_user(self,firstname):
-        self.cur.execute('SELECT * FROM users WHERE f_name = %s;', (firstname,))
+    def fetch_user(self,user_id):
+        self.cur.execute('SELECT * FROM users WHERE f_name = %s;', (user_id,))
         return self.cur.fetchall()
     def fetch_transactions_by_user(self, user_id):
         self.cur.execute("SELECT * FROM transaction WHERE user_id = %s;", (user_id,))
@@ -154,12 +154,12 @@ class Ledger:
         self.db_manager.insert_transaction(transaction, user_id)
 
         return f"Transaction added for {user.first_name} {user.last_name}"
-    def get_user(self,firstname): # Accessing users by their names
-        user = [(u for u in self.users if u.first_name == firstname)]
+    def get_user(self,user_id): # Accessing users by their id
+        user = [(u for u in self.users if u.userid == user_id)]
         if not user:
             raise ValueError('User does not exist')
         else:
-            return self.db_manager.fetch_user(firstname)
+            return self.db_manager.fetch_user(user_id)
     def get_user_transactions(self, user_id):
         # Ensure user_id exists in memory using list expression
 
