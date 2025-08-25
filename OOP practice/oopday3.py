@@ -77,7 +77,7 @@ class DBMANAGER:
         f_name VARCHAR(100),
         l_name VARCHAR(100)
        );
-       """) #tarnsaction table
+       """) #transaction table
         self.execute("""
             CREATE TABLE IF NOT EXISTS TRANSACTION(
             transaction_id UUID PRIMARY KEY,
@@ -99,7 +99,7 @@ class DBMANAGER:
                     (user.userid, user.first_name, user.last_name)
                 )
             self.conn.commit()  # Commit the transaction
-    #function to insert transactions into the database
+    #Function to insert transactions into the database
     def insert_transaction(self, transaction, user_id):
         if not isinstance(transaction, Transaction):
             raise TypeError("transaction must be a Transaction object")
@@ -117,7 +117,7 @@ class DBMANAGER:
             self.conn.commit()
         except Exception as e:
             print("Insert error:", e)
-    #function to fetch users
+    #Function to fetch users
     def fetch_user(self,user_id):
         self.cur.execute('SELECT * FROM users WHERE f_name = %s;', (user_id,))
         return self.cur.fetchall()
@@ -131,8 +131,8 @@ class DBMANAGER:
 #Ledger class handling main logic
 class Ledger:
     def __init__(self, db_manager):
-        self.users = []          # in-memory list of users
-        self.db_manager = db_manager # handling database connectiion
+        self.users = []          # In-memory list of users
+        self.db_manager = db_manager # Handling database connectiion
 
     def add_user(self, user):
         self.users.append(user)
@@ -161,7 +161,7 @@ class Ledger:
         else:
             return self.db_manager.fetch_user(user_id)
     def get_user_transactions(self, user_id):
-        # Ensure user_id exists in memory using list expression
+        # Ensures user_id exists in memory using list expression
 
         user = [(u for u in self.users if u.userid == user_id)]
         if not user:
