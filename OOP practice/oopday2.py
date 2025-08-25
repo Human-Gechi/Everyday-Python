@@ -1,11 +1,13 @@
 from datetime import datetime
 import pandas as pd
 import regex as re
+#Class for categories
 class Category:
     def __init__(self,name:str):
         self.name = name
     def __str__(self):
         return f"Category: {self.name}"
+#Ec=xpense Class
 class Expense:
     def __init__(self, amount: float, date: datetime = None, category: str = "", description: str = ""):
         self.amount = amount
@@ -18,11 +20,12 @@ class Expense:
            (f" — {self.description}" if self.description else "")
     def __repr__(self): # to avoid looping throught the list of expenses when calling the func.
         return self.__str__()
-#base expenses class
+#Base Expenses tracker class
 class ExpenseTracker:
     def __init__(self):
         self.categories = []
         self.expenses = []
+    # Adding categories
     def add_category(self, name):
         if not name:
             return False
@@ -30,6 +33,7 @@ class ExpenseTracker:
             category = Category(name)
             self.categories.append(category)
             return True
+    #Displaying available categories
     def show_categories(self):
         if not self.categories:
             print("No categories available.")
@@ -42,7 +46,7 @@ class ExpenseTracker:
         if amount <= 0:
             raise ValueError("Amount should be greater than zero")
 
-        #verify category exists
+        #Verify if category exists
         if not any(cat.name == category_name for cat in self.categories):
             print(f'Category:{category_name} does not exist')
             return None
@@ -50,7 +54,7 @@ class ExpenseTracker:
             expense = Expense(amount, date, category_name, description)
             self.expenses.append(expense)
             return True
-
+    # Method for getting expenses by category
     def get_expenses_by_category(self, category_name, file_path=r"C:\Users\HP\OneDrive\Desktop\Pythonpractice\OOP practice\Report.csv"):
         try:
             if file_path:
@@ -63,7 +67,7 @@ class ExpenseTracker:
         except FileNotFoundError:
             print("File not found.")
             return []
-
+    #Method for getting expenses by date
     def get_expenses_by_date(self,date,file_path=r"C:\Users\HP\OneDrive\Desktop\Pythonpractice\OOP practice\Report.csv"):
         try:
             if file_path:  # If CSV file is provided
@@ -74,7 +78,7 @@ class ExpenseTracker:
             else:  # Use in-memory expenses list
                 return [expense for expense in self.expenses if expense.category == date]
 
-        except FileNotFoundError:
+        except FileNotFoundError: # Catching FileNotFoundError
             print("File not found.")
             return []
     def total_expenses_by_category(self,category_name,file_path= r'C:\Users\HP\OneDrive\Desktop\Pythonpractice\OOP practice\Report.csv'):
@@ -100,11 +104,11 @@ class ExpenseTracker:
             })
         new_df = pd.DataFrame(new_data)
 
-        #Merge old + new, drop duplicates
+        #Mergeing old + new DataFrame , drop duplicates
         combined_df = pd.concat([old_df, new_df]).drop_duplicates()
 
         combined_df.to_csv(file_path, index=False)
-# quick demo
+# Quick demo
 product = ExpenseTracker()
 product.add_category('Groceries')
 product.add_category('Drugs')
